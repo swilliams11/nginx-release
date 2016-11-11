@@ -1,0 +1,143 @@
+---
+name: nginx
+
+director_uuid: fb70f16a-4d6f-41f8-bc2e-0181a03dff18 # FIXME you put Director's UUID
+
+releases:
+- name: nginx
+  version: latest
+
+stemcells:
+- alias: bosh-warden-boshlite-ubuntu-trusty-go_agent
+  os: ubuntu-trusty
+  version: latest
+
+instance_groups:
+- name: nginx
+  instances: 1
+  vm_type: small
+  azs:
+  - z1
+  persistent_disk_type: nginx
+  stemcell: bosh-warden-boshlite-ubuntu-trusty-go_agent
+  networks:
+  - name: default
+    # FIXME: replace the IP address with your Elastic IP
+    # the Elastic IP must have scope 'vpc' not 'standard'
+    static_ips: [ 10.244.5.2 ] 
+
+  jobs:
+  - name: nginx
+    release: nginx
+    properties:
+      nginx_conf: |
+        worker_processes  1;
+        error_log /var/vcap/sys/log/nginx/error.log   info;
+        events {
+          worker_connections  1024;
+        }
+        http {
+          include /var/vcap/packages/nginx/conf/mime.types;
+          default_type  application/octet-stream;
+          sendfile        on;
+          keepalive_timeout  65;
+          server_names_hash_bucket_size 64;
+
+          upstream localhost-server {
+            server 10.244.0.2:8000; #TODO Need to extract as variable
+          }
+          # redirect HTTP to HTTPS
+          server {
+            server_name _; # invalid value which will never trigger on a real hostname.
+            listen 80;
+            # FIXME: replace all occurrences of 'www.nono.io' with your server's FQDN
+            rewrite ^ https://springhello.io$request_uri?;
+            access_log /var/vcap/sys/log/nginx/springhello-access.log;
+            error_log /var/vcap/sys/log/nginx/springhello.io-error.log;
+
+
+          }
+
+          server {
+            server_name springhello.io;
+            # weak DH https://weakdh.org/sysadmin.html
+            ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
+            ssl_prefer_server_ciphers on;
+            # poodle https://scotthelme.co.uk/sslv3-goes-to-the-dogs-poodle-kills-off-protocol/
+            ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+            listen              443 ssl;
+            ssl_certificate     /var/vcap/jobs/nginx/etc/ssl_chained.crt.pem;
+            ssl_certificate_key /var/vcap/jobs/nginx/etc/ssl.key.pem;
+            access_log /var/vcap/sys/log/nginx/springhello.io-access.log;
+            error_log /var/vcap/sys/log/nginx/springhello.io-error.log;
+            location / {
+              proxy_pass http://localhost-server;
+            }
+            #root /var/vcap/store/nginx/www/document_root;
+            #index index.shtml index.html index.htm;
+          }
+        }
+      # FIXME: replace with your HTTPS SSL key
+      ssl_key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        MIIEowIBAAKCAQEA9yv1JXYAbyceBeSSbpptxYU74qimttPXQp5Re6vGyEtvJfJE
+        4F7Xw/3g0vtqyFMnn1ma+DnMy7V7+h9NPlWiiB0V62q/YIhWGVIlqFfoimeKo+dn
+        Z4Fy0jq/gKBsRAt/pnlVs9P/5L/iVe/EYhjPyeEXvIgmromok9rRZpjCOtLHx8Jr
+        nKQYnaeramkxKaJ1n8Hn4wfDfJDrm/REtZ9AhC1EzwgiMB65bgBg+m1AbgtSEwOL
+        rPA7gGK/cr83EyGFJXYh5QWT3FM5A794bzs+W9Arbl5NpGh5WKiMzi/S0/+kBG0f
+        5/uxUAYMk3LEVhwqLDnWo9ZMb8GJavCOYTTlhwIDAQABAoIBADARS15aoWD8YXlR
+        5yw9OgXEkE3W8Hzzm5QoB76ePE0tZlMh10UvDJTf5X4CSNTmXvk9SsblLq+a/p44
+        wiPSMYZ46Y9bthYGzX+lGw+u8Nkho7OWR+S4JuU9aYqRKBzfg5aTWBhdrREGQ/Tk
+        aPOO0bH35U7Tx3n/6Vm/nyNtp7Aadcr0rlVXyfX970D5SJUb0Ni3b6ILS9ptn6g9
+        5ppmR+50IG16gI6hjbiIJvfihQjoEx8j7YgvU4ztDsfMEvmgvB/C0+YAFFX5/R0W
+        iyqCphvcNoquPbFp4EHAiHoTp3740PJlJNkpbsYutQjy54uKVu+eunqfYdqF8cdn
+        hX01XNkCgYEA/A9OfJrSRuLSbVyM9gfSg8F+NL9NPIrbJLTjFk6U9yr0upWQpKSU
+        i8HYUAWVYXvbLkUiU81dE5mr7st2+pFiX5HsMPrB8keQjLFgNY+AiqAPMWF/AsdV
+        oALmMOYNeKdfkIGguM1wIg59tf2ZT5VvzFneuSBjcWy/ClA3TEzSdSMCgYEA+wkX
+        AjBltWmbJdobbnHZJS2UYSM6Vp8/BmXryJ6ANOLKcwM8MeW5nX3Ces9+NQwoTj4F
+        R55lyUUB0r7OYJZ7R7aM3EUTJ/o63ieDywm2odir8DXK226B1RqwibD5fDVBkl8v
+        AGVw/JfvJ9n2nIjgOELYkod9IVDUAr44Xc3dTk0CgYEAthqI5dUk3jm5NXGMFaQJ
+        H0+H0qvzLS5UrOxStCcJ0JikPrkXyxtshpwBn66pAcjtzTv9VPYlrKd1ZAxzZQvs
+        Ooe+UJSZ0mSJtlvf2lJW19BTqaV6kZNZ9USi8ekDCoxBqrE8YMdrn+9AO1+Ah9K6
+        9rRnCPCxZ5zdWKIjkWhfFGkCgYAD/ccB3+ceFUnENk2NWf4L20eqq7a3vdxwq5ou
+        HGcJcDmrzndci7yBxogbD8V/7muNourOkrQnmRNIWIRLgNkA8OQYdHizgAUDlzk/
+        Ny5SMHG7Zf+NsZoa20vHRKsS0H30Z9MFfJdpTLketxZ2sq5t9pIe8kyJBRH54TBg
+        PW+xWQKBgBWG9j/v9Y56+3LGfq1/EZTkZQh4JyPpOKltgvHZ6bhLPjhcCVaP0QbU
+        P+VmEmEMh2VXCCQPb+yAqmb1UFEXTLbHgRRNX6sJVWMpDtETOvOsypGpwSoB5Jy8
+        RZZMJ/yjOrXB7u2y3e8efa7O29O44VVW/wwFH2dMvP+EvYiKijbT
+        -----END RSA PRIVATE KEY-----
+      # FIXME: replace with your HTTPS SSL chained certificate
+      ssl_chained_cert: |
+        -----BEGIN CERTIFICATE-----
+        MIIEaDCCA1CgAwIBAgIJANP1AiUGZM+5MA0GCSqGSIb3DQEBBQUAMH8xCzAJBgNV
+        BAYTAlVTMREwDwYDVQQIEwhJbGxpbm9pczEQMA4GA1UEBxMHQ2hpY2FnbzEQMA4G
+        A1UEChMHTXkgQ29ycDEXMBUGA1UEAxMOc3ByaW5naGVsbG8uaW8xIDAeBgkqhkiG
+        9w0BCQEWEW15ZW1haWxAZW1haWwuY29tMB4XDTE2MTExMDIyMjgxNFoXDTE2MTIx
+        MDIyMjgxNFowfzELMAkGA1UEBhMCVVMxETAPBgNVBAgTCElsbGlub2lzMRAwDgYD
+        VQQHEwdDaGljYWdvMRAwDgYDVQQKEwdNeSBDb3JwMRcwFQYDVQQDEw5zcHJpbmdo
+        ZWxsby5pbzEgMB4GCSqGSIb3DQEJARYRbXllbWFpbEBlbWFpbC5jb20wggEiMA0G
+        CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQD3K/UldgBvJx4F5JJumm3FhTviqKa2
+        09dCnlF7q8bIS28l8kTgXtfD/eDS+2rIUyefWZr4OczLtXv6H00+VaKIHRXrar9g
+        iFYZUiWoV+iKZ4qj52dngXLSOr+AoGxEC3+meVWz0//kv+JV78RiGM/J4Re8iCau
+        iaiT2tFmmMI60sfHwmucpBidp6tqaTEponWfwefjB8N8kOub9ES1n0CELUTPCCIw
+        HrluAGD6bUBuC1ITA4us8DuAYr9yvzcTIYUldiHlBZPcUzkDv3hvOz5b0CtuXk2k
+        aHlYqIzOL9LT/6QEbR/n+7FQBgyTcsRWHCosOdaj1kxvwYlq8I5hNOWHAgMBAAGj
+        geYwgeMwHQYDVR0OBBYEFJK4igDLgmjMa374PlizazYU7hjtMIGzBgNVHSMEgasw
+        gaiAFJK4igDLgmjMa374PlizazYU7hjtoYGEpIGBMH8xCzAJBgNVBAYTAlVTMREw
+        DwYDVQQIEwhJbGxpbm9pczEQMA4GA1UEBxMHQ2hpY2FnbzEQMA4GA1UEChMHTXkg
+        Q29ycDEXMBUGA1UEAxMOc3ByaW5naGVsbG8uaW8xIDAeBgkqhkiG9w0BCQEWEW15
+        ZW1haWxAZW1haWwuY29tggkA0/UCJQZkz7kwDAYDVR0TBAUwAwEB/zANBgkqhkiG
+        9w0BAQUFAAOCAQEAj+W5jMfrN8VvA1hxWtIyH7+b3DOHy5SUgeT9JAoVRVfJSdGV
+        5fdgJnFwbEuw1eYxgKKCSHKLur9SabBOMiU2yHb6mZF+nYSwQRhT+YYW0rFOqH8O
+        GLtegj3stc0UuuiGe7kHOIZuAlVb/e4ok25bD1JQZuKnKfmaVJ0g5chHWxan/u/I
+        /zzjEA/yUPolABdCSvpGFdtkR4WnOoA+X9NSLJJujrA/bQY/aKQ0yHq8s2jLyCf2
+        NqiU0cd7Adn7H4rOyDQniJz0WTvVI9jxUyi7910Zic09ap36w8EqF+oLPpwRh48Y
+        Rn8BMbcEMMN7JLBKD4QlCUuf/SKVVmKuKhXbeg==
+        -----END CERTIFICATE-----
+
+update:
+  canaries: 1
+  max_in_flight: 1
+  serial: false
+  canary_watch_time: 1000-60000
+  update_watch_time: 1000-60000
