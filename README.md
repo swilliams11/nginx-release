@@ -1,113 +1,114 @@
-# BOSH-deployed nginx Server
+# BOSH-deployed nginx Server for Edgemicro
 
-This BOSH release deploys nginx server.
+This BOSH release deploys nginx server.  This repo is explicitly for the [apigee-cloudfoundry-edgemicro](https://github.com/swilliams11/apigee-cloudfoundry-edgemicro).
+It already has a self-signed public certificate and private key included so you don't have to create it.
 
-### 1. Upload release to BOSH Director
+### Prerequisites
+1. Install [Bosh Lite](https://github.com/cloudfoundry/bosh-lite)
+2. Install [Bosh CLI](https://bosh.io/docs/bosh-cli.html)
+3. Set your bosh target
 
 ```
-bosh upload release https://github.com/cloudfoundry-community/nginx-release/releases/download/v4/nginx-4.tgz
+bosh target 192.168.50.4 lite
+```
+username/password should be admin/admin
+
+4. Add the following routes.
+`10.244.0.0` is for Bosh/containers
+`10.244.5.0/24` is for Nginx.
+
+```
+sudo route add -net 10.244.0.0/19 192.168.50.4
+sudo route add -net 10.244.5.0/24 192.168.50.4
+
 ```
 
-### 2. Create BOSH manifest to deploy nginx server
+Linux users
+```
+sudo ip route add 10.244.0.0/19 via 192.168.50.4
+sudo ip route add 10.244.5.0/24 via 192.168.50.4
+```
 
-* Use the `nginx.yml` manifest from the `examples/` subdirectory as a template
-* Search for all occurrences of `FIXME` and modify as appropriate
-* You may need to adjust your [cloud config](https://bosh.io/docs/cloud-config.html);
-  `examples/cloud-config-aws.yml` is an AWS-specific *Cloud Config* that
-  corresponds with `nginx.yml`. Merge that with your *Cloud Config*.
-* If you're using [bosh-init](https://bosh.io/docs/using-bosh-init.html)
-  instead of a BOSH Director, use the `nginx-aws-bosh-init.yml` as an
-  example *bosh-init* manifest.
+### 1. Clone this Repository
 
-### 3. Deploy
+```
+git clone git@github.com:swilliams11/nginx-release.git
+```
 
-Update your *Cloud Config* and deploy the release:
+### 2. Update the Director UUID
+* Execute the following command to get the Bosh Director uuid
+```
+bosh status
+```
+
+Response
+```
+Director
+  Name       Bosh Lite Director
+  URL        https://hostname:25555
+  Version    1.3262.3.0 (00000000)
+  User       admin
+  UUID       fb70f16a-4d6f-41f8-bc2e-0181a03dff18
+  CPI        warden_cpi
+  dns        disabled
+```
+
+
+* Open the `nginx_manifest.yml` file and change the `director_uuid` to the director uuid of your Bosh Director shown above.
+
+### 3. Upload cloud-config
+The manifest.yml file was updated to V2 so that it is cloud provider agnostic.  
+[Manifest.yml V2](http://bosh.io/docs/manifest-v2.html)
+
+
+Execute the following commands.
+
+```
+cd nginx-release
+
+bosh update cloud-config cloud.yml
+```
+
+View cloud config.
+```
+bosh cloud-config
+```
+
+### 4. Deploy the Release
+Make sure to execute these commands from the `nginx-release` directory.
 
 ```bash
-bosh update cloud-config merged-cloud-config.yml
-bosh deployment nginx.yml
+bosh create release --force
+
+bosh upload release
+
+bosh deployment nginx_manifest.yml
+
 bosh deploy
 ```
 
-### 4. Post-deployment HTML content
+Once Nginx is deployed you can open a browser and enter the following IP.
+`http://10.244.5.2`
 
-You must manually add the HTML content *after* successful deployment.
+You should be automatically redirected to `https`. Now that you have confirmed that Nginx is running, you can proceed to creating the [apigee-cloudfoundry-edgemicro release](https://github.com/swilliams11/apigee-cloudfoundry-edgemicro).
 
-We recommend installing HTML content on the persistent disk, e.g.
-`/var/vcap/store/nginx/document_root/` so that subsequent redeploys
-do not require re-installation of HTML content, i.e. the
-`nginx.conf` should have the following directive:
+### 5. Optionally Configure the Domain Name in /etc/hosts
+You can modify your `/etc/hosts` file to include the following entry.  
 
 ```
-server {
-  root /var/vcap/store/nginx/www/document_root;
+10.244.5.2      springhello.io
 ```
 
-In the following example, we use `git` to clone our HTML
-content for our website, sslip.io.
+Then you can use the domain name in the browser `https://springhello.io` and when sending the curl commands to the Microgateway.  
 
-We ssh into our deployed VM.
-
-```bash
-# ssh in and become root
-ssh -i $AWS_KEY_PAIR vcap@$ELASTIC_IP
-sudo su - # password is 'c1oudc0w'
-mkdir -p /var/vcap/store/nginx/www/ # create if needed
-git clone https://github.com/cunnie/sslip.io.git /var/vcap/store/nginx/document_root/
-```
-
-Browse to your VM's elastic IP to ensure that the page loads as expected.
 
 ## Notes
+The original documentation for this is in [README2.md](README2.md). See this file if you want to know who `nginx.conf` is configured.   
+
 
 #### 1. nginx Job Properties
+* HTTPS is configured with a self-signed certificate. The certificate and key is located in the `mycerts` directory.  
 
-* `nginx_conf`: *Required*. This contains the contents of nginx's configuration
-  file, nginx.conf. Here is the beginning from a sample configuration:
-  ```yaml
-    nginx_conf: |
-      worker_processes  1;
-      error_log /var/vcap/sys/log/nginx/error.log   info;
-  ```
-
-* `ssl_key`: *Optional*, defaults to ''. This contains the contents of the
-  SSL key in PEM-encoded format. This is required if deploying an HTTPS webserver.
-  The key is deployed to the path `/var/vcap/jobs/nginx/etc/ssl.key.pem` and
-  requires the following line in the `nginx_conf`'s *server* definition:
-
-  ```
-  ssl_certificate_key /var/vcap/jobs/nginx/etc/ssl.key.pem;
-  ```
-
-  Here is the beginning from a sample configuration:
-
-  ```yaml
-  ssl_key: |
-    -----BEGIN RSA PRIVATE KEY-----
-    MIIJKQIBAAKCAgEAyv4in6scMw3OkBlr++1OooLuZQKftmwGIO8puOj6lSH4H1LI
-  ```
-
-* `ssl_chained_cert`: *Optional*, defaults to ''. This contains the contents of the
-  SSL certificate in PEM-encoded format. This file will most likely contain several
-  chained certificates.
-  The certificate for the server should appear at the
-  top, followed by the intermediate certificate.
-  This property is required if deploying an HTTPS webserver.
-  The certificate is deployed to the path `/var/vcap/jobs/nginx/etc/ssl_chained.crt.pem` and
-  requires the following line in the `nginx_conf` *server* definition:
-
-  ```
-  ssl_certificate     /var/vcap/jobs/nginx/etc/ssl_chained.crt.pem;
-  ```
-
-  Here is the beginning from a sample configuration:
-
-  ```yaml
-  ssl_chained_cert: |
-    -----BEGIN CERTIFICATE-----
-    MIIGSjCCBTKgAwIBAgIRAOxg+vyhygau6bc2SAooL6owDQYJKoZIhvcNAQELBQAw
-  ```
-
-### Caveats
-
-* We've only tested on AWS
+* nginx is configured to have a static IP address of `10.244.5.2`
+* nginx is confirgured to have an upstream server (microgateway) with the IP `10.244.0.2:8000`
+  View the `nginx_manifest.yml` file to see the nginx configuration.
