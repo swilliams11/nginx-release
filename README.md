@@ -103,7 +103,7 @@ Then you can use the domain name in the browser `https://springhello.io` and whe
 
 
 ## Notes
-The original documentation for this is in [README2.md](README2.md). See this file if you want to know who `nginx.conf` is configured.   
+The original documentation for this is in [README2.md](README2.md). See this file if you want to know how `nginx.conf` is configured.   
 
 
 #### 1. nginx Job Properties
