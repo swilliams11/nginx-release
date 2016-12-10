@@ -24,7 +24,7 @@ instance_groups:
   - name: default
     # FIXME: replace the IP address with your Elastic IP
     # the Elastic IP must have scope 'vpc' not 'standard'
-    static_ips: [ 10.244.5.2 ] 
+    static_ips: [ 10.244.5.2 ]
 
   jobs:
   - name: nginx
@@ -44,7 +44,7 @@ instance_groups:
           server_names_hash_bucket_size 64;
 
           upstream localhost-server {
-            server 10.244.0.2:8000; #TODO Need to extract as variable
+            server 10.244.1.2:8000; #TODO Need to extract as variable
           }
           # redirect HTTP to HTTPS
           server {

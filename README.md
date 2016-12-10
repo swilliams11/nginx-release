@@ -14,18 +14,18 @@ bosh target 192.168.50.4 lite
 username/password should be admin/admin
 
 4. Add the following routes.
-`10.244.0.0` is for Bosh/containers
+`10.244.1.0` is for Bosh/containers
 `10.244.5.0/24` is for Nginx.
 
 ```
-sudo route add -net 10.244.0.0/19 192.168.50.4
+sudo route add -net 10.244.1.0/24 192.168.50.4
 sudo route add -net 10.244.5.0/24 192.168.50.4
 
 ```
 
 Linux users
 ```
-sudo ip route add 10.244.0.0/19 via 192.168.50.4
+sudo ip route add 10.244.1.0/24 via 192.168.50.4
 sudo ip route add 10.244.5.0/24 via 192.168.50.4
 ```
 
@@ -110,5 +110,5 @@ The original documentation for this is in [README2.md](README2.md). See this fil
 * HTTPS is configured with a self-signed certificate. The certificate and key is located in the `mycerts` directory.  
 
 * nginx is configured to have a static IP address of `10.244.5.2`
-* nginx is confirgured to have an upstream server (microgateway) with the IP `10.244.0.2:8000`
+* nginx is confirgured to have an upstream server (microgateway) with the IP `10.244.1.2:8000`
   View the `nginx_manifest.yml` file to see the nginx configuration.
