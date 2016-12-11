@@ -110,5 +110,5 @@ The original documentation for this is in [README2.md](README2.md). See this fil
 * HTTPS is configured with a self-signed certificate. The certificate and key is located in the `mycerts` directory.  
 
 * nginx is configured to have a static IP address of `10.244.5.2`
-* nginx is confirgured to have an upstream server (microgateway) with the IP `10.244.1.2:8000`
+* nginx is configured to have an upstream server (microgateway) with the IP `10.244.1.2:8000`
   View the `nginx_manifest.yml` file to see the nginx configuration.
